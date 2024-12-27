@@ -254,6 +254,30 @@ export class FirebaseStorageAdapter implements StorageAdapter {
     }
   }
 
+  async getSessionMetadata(sessionId: string): Promise<SessionMetadata | null> {
+    try {
+      const sessionRef = ref(this.database, `games/${sessionId}`);
+      const snapshot = await get(sessionRef);
+      if (!snapshot.exists()) return null;
+      
+      const data = snapshot.val();
+      return {
+        id: sessionId,
+        name: data.name || '',
+        status: data.status || 'pending',
+        createdAt: data.createdAt || Date.now(),
+        updatedAt: data.updatedAt || Date.now(),
+        config: data.config || {},
+        players: Object.keys(data.gameState?.players || {}).length || 0,
+        currentRound: data.gameState?.currentRound || 1,
+        totalRounds: data.gameState?.totalRounds || 0
+      };
+    } catch (error) {
+      console.error('Error getting session metadata:', error);
+      return null;
+    }
+  }
+
   cleanup(): void {
     if (this.unsubscribe) {
       this.unsubscribe();

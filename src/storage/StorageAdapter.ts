@@ -8,6 +8,7 @@ export interface StorageAdapter {
   updateSessionStatus(sessionId: string, status: 'active' | 'completed' | 'archived'): Promise<void>;
   setCurrentSession(sessionId: string): void;
   deleteSession?(sessionId: string): Promise<void>;
+  getSessionMetadata(sessionId: string): Promise<SessionMetadata | null>;
 
   // Game state management
   getGameState(): Promise<GameState | null>;

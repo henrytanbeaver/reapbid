@@ -76,12 +76,26 @@ const SessionManagerComponent: React.FC = () => {
 
   // Memoized values
   const steps = useMemo(() => ['Name Your Session', 'Configure Game Settings', 'Visibility Settings'], []);
+  const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning' => {
+    switch (status) {
+      case 'active':
+        return 'success';
+      case 'completed':
+        return 'info';
+      case 'archived':
+        return 'default';
+      case 'pending':
+        return 'warning';
+      default:
+        return 'default';
+    }
+  };
+
   const sessionData = useMemo(() => {
     return sessions.map(session => ({
       ...session,
       isSelected: session.id === currentSessionId,
-      statusColor: session.status === 'completed' ? 'info' :
-                  session.status === 'active' ? 'success' : 'default'
+      statusColor: getStatusColor(session.status)
     }));
   }, [sessions, currentSessionId]);
 
@@ -419,11 +433,11 @@ const SessionManagerComponent: React.FC = () => {
                 <TableCell>
                   <Chip
                     label={session.status}
+                    color={getStatusColor(session.status)}
                     size="small"
-                    color={session.statusColor as any}
                   />
                 </TableCell>
-                <TableCell>{session.totalPlayers || 0}</TableCell>
+                <TableCell>{session.players || 0}</TableCell>
                 <TableCell>
                   {displayRound(session.currentRound, session.totalRounds)}
                 </TableCell>

@@ -12,6 +12,7 @@ export interface SessionContextType {
   updateSessionStatus: (sessionId: string, status: 'active' | 'completed' | 'archived') => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   refreshSessions: () => Promise<void>;
+  refreshSingleSession: (sessionId: string) => Promise<void>;
   exitSession: () => void;  // Keep this for backward compatibility
 }
 
@@ -54,6 +55,24 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     refreshSessions();
   }, []);
 
+  // Add function to refresh a single session
+  const refreshSingleSession = useCallback(async (sessionId: string) => {
+    try {
+      const session = await storage.getSessionMetadata(sessionId);
+      if (session) {
+        setSessions(prev => {
+          const index = prev.findIndex(s => s.id === sessionId);
+          if (index === -1) return [...prev, session];
+          const newSessions = [...prev];
+          newSessions[index] = session;
+          return newSessions;
+        });
+      }
+    } catch (err) {
+      console.error('Error refreshing single session:', err);
+    }
+  }, []);
+
   // Simple session selection
   const selectSession = useCallback((sessionId: string) => {
     if (sessionId === currentSessionId) {
@@ -64,7 +83,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     console.log('Selecting session:', sessionId);
     storage.setCurrentSession(sessionId);
     setCurrentSessionId(sessionId);
-  }, [currentSessionId]);
+    refreshSingleSession(sessionId); // Refresh just this session's data
+  }, [currentSessionId, refreshSingleSession]);
 
   // Add exitSession for backward compatibility
   const exitSession = useCallback(() => {
@@ -135,6 +155,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateSessionStatus,
     deleteSession,
     refreshSessions,
+    refreshSingleSession,
     exitSession
   }), [
     sessions,
@@ -146,6 +167,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateSessionStatus,
     deleteSession,
     refreshSessions,
+    refreshSingleSession,
     exitSession
   ]);
 

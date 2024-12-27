@@ -109,16 +109,16 @@ const SessionSelectionDialog: React.FC<SessionSelectionDialogProps> = ({
                             variant="body2"
                             color="text.primary"
                           >
-                            Players: {session.totalPlayers ?? 0} / {session.config.maxPlayers}
+                            Players: {session.players ?? 0} / {session.config.maxPlayers}
                           </Typography>
-                          {session.totalPlayers === session.config.maxPlayers && (
+                          {session.players === session.config.maxPlayers && (
                             <Typography
                               component="span"
                               variant="body2"
-                              color="warning.main"
+                              color="error"
                               sx={{ ml: 1 }}
                             >
-                              (Full - Only registered players can join)
+                              (Full)
                             </Typography>
                           )}
                           <br />

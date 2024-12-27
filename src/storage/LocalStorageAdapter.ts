@@ -1,5 +1,6 @@
 import { StorageAdapter } from './StorageAdapter';
 import { GameState, Player, RoundResult } from '../context/GameContext';
+import { SessionMetadata } from './SessionStorageAdapter';
 
 const DEFAULT_ALPHA = 0.5;
 const DEFAULT_MARKET_SIZE = 1000;
@@ -208,6 +209,11 @@ export class LocalStorageAdapter implements StorageAdapter {
         this.listeners.forEach(listener => listener(this.EMPTY_GAME_STATE));
       }
     }
+  }
+
+  async getSessionMetadata(sessionId: string): Promise<SessionMetadata | null> {
+    // Local storage doesn't support multiple sessions
+    return Promise.resolve(null);
   }
 
   setCurrentSession(sessionId: string): void {

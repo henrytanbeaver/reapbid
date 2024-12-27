@@ -6,6 +6,7 @@ import {
   get, 
   update,
   remove,
+  child,
   Database 
 } from 'firebase/database';
 import { database } from '../firebase/config';
@@ -48,13 +49,13 @@ export interface Session {
 export interface SessionMetadata {
   id: string;
   name: string;
+  status: 'pending' | 'active' | 'completed' | 'archived';
   createdAt: number;
   updatedAt: number;
-  status: 'active' | 'completed' | 'archived';
-  totalPlayers?: number;
-  currentRound?: number;
-  totalRounds?: number;
   config: GameConfig;
+  players: number;
+  currentRound: number;
+  totalRounds: number;
 }
 
 export class SessionStorageAdapter implements StorageAdapter {
@@ -160,40 +161,29 @@ export class SessionStorageAdapter implements StorageAdapter {
     try {
       const snapshot = await get(this.sessionsRef);
       const sessions = snapshot.val() || {};
-      
-      return Object.entries(sessions).map(([id, session]: [string, any]) => {
-        // Calculate total players from gameState.players
-        const totalPlayers = session.gameState?.players ? Object.keys(session.gameState.players).length : 0;
-        
-        // Log session status for debugging
-        console.log(`Session ${id} status:`, session.status);
-        console.log(`Session ${id} gameState.isEnded:`, session.gameState?.isEnded);
-        
-        // Defensive check for config
-        const config = session.config || {
-          totalRounds: 3,  // Default value
-          roundTimeLimit: 60,
-          minBid: 0,
-          maxBid: 100,
-          costPerUnit: 50,
-          maxPlayers: 4
-        };
+      const sessionIds = Object.keys(sessions);
 
-        // If game is ended, session should be completed
-        const status = session.gameState?.isEnded ? 'completed' : (session.status || 'active');
-        
+      const sessionsMetadata = await Promise.all(sessionIds.map(async (id) => {
+        const sessionRef = child(this.sessionsRef, id);
+        const snapshot = await get(sessionRef);
+        const session = snapshot.val();
+        const config = session.config || {};
+        const totalPlayers = Object.keys(session.gameState?.players || {}).length;
+
         return {
           id,
-          name: session.name || 'Unnamed Session',
+          name: session.name,
+          status: session.status || 'pending',
           createdAt: session.createdAt || Date.now(),
           updatedAt: session.updatedAt || Date.now(),
-          status,
-          totalPlayers,
+          config,
+          players: totalPlayers,
           currentRound: session.gameState?.currentRound || 1,
-          totalRounds: config.totalRounds,
-          config
+          totalRounds: config.totalRounds || 0
         };
-      });
+      }));
+
+      return sessionsMetadata;
     } catch (error) {
       console.error('Error listing sessions:', error);
       return [];
@@ -454,6 +444,30 @@ export class SessionStorageAdapter implements StorageAdapter {
     } catch (error) {
       // console.log('Error deleting session:', error);
       throw error;
+    }
+  }
+
+  async getSessionMetadata(sessionId: string): Promise<SessionMetadata | null> {
+    try {
+      const sessionRef = child(this.sessionsRef, sessionId);
+      const snapshot = await get(sessionRef);
+      if (!snapshot.exists()) return null;
+      
+      const data = snapshot.val();
+      return {
+        id: sessionId,
+        name: data.name,
+        status: data.status || 'pending',
+        createdAt: data.createdAt || Date.now(),
+        updatedAt: data.updatedAt || Date.now(),
+        config: data.config || {},
+        players: Object.keys(data.gameState?.players || {}).length || 0,
+        currentRound: data.gameState?.currentRound || 1,
+        totalRounds: data.gameState?.totalRounds || 0
+      };
+    } catch (error) {
+      console.error('Error getting session metadata:', error);
+      return null;
     }
   }
 
