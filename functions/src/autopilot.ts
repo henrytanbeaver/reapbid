@@ -21,19 +21,32 @@ async function processGameRound(
 ): Promise<void> {
   console.log("[ProcessRound] Starting round processing");
 
-  if (!gameState || !gameState.players || !gameState.maxBid) {
-    console.error("[ProcessRound] Invalid game state:", gameState);
-    throw new Error("Invalid game state: required fields missing");
+  if (!gameRef?.key || !gameState || !gameState.players || !gameState.maxBid) {
+    console.error("[ProcessRound] Invalid game state or reference:", {
+      hasGameRef: !!gameRef,
+      hasKey: !!gameRef?.key,
+      hasGameState: !!gameState,
+      hasPlayers: !!gameState?.players,
+      hasMaxBid: !!gameState?.maxBid,
+    });
+    throw new Error("Invalid game state or reference: required fields missing");
+  }
+
+  const gameId = gameRef.key;
+  const players = gameState.players || {};
+  const playerIds = Object.keys(players);
+
+  if (playerIds.length === 0) {
+    console.error("[ProcessRound] No players found in game state");
+    throw new Error("No players found in game state");
   }
 
   console.log("[ProcessRound] Initial game state:", {
     currentRound: gameState.currentRound,
     totalRounds: gameState.totalRounds,
-    players: Object.keys(gameState.players),
+    players: playerIds,
     roundBids: gameState.roundBids,
   });
-
-  const gameId = gameRef.key as string;
 
   try {
     const costPerUnit = gameState.costPerUnit;
@@ -41,13 +54,12 @@ async function processGameRound(
 
     // Initialize all players with maxBid, then override with actual bids if submitted
     const updatedBids: Record<string, number> = {};
-    Object.keys(gameState.players).forEach((playerId) => {
-      const player = gameState.players[playerId];
+    playerIds.forEach((playerId) => {
+      const player = players[playerId];
       // Use actual bid if submitted, otherwise use maxBid
-      updatedBids[playerId] = (player.hasSubmittedBid &&
-        player.currentBid &&
-        player.currentBid !== null &&
-        player.currentBid !== undefined) ?
+      updatedBids[playerId] = (player?.hasSubmittedBid &&
+        typeof player.currentBid === "number" &&
+        !isNaN(player.currentBid)) ?
         player.currentBid :
         maxBid;
     });
@@ -75,16 +87,16 @@ async function processGameRound(
     const updates: { [key: string]: any } = {};
 
     // Add round to history under gameState
-    updates["gameState/roundHistory/" + (gameState.currentRound - 1)] = roundResult;
-    console.log("[ProcessRound] Adding round to history under gameState at index:", gameState.currentRound - 1);
+    const roundIndex = Math.max(0, (gameState.currentRound || 1) - 1);
+    updates[`gameState/roundHistory/${roundIndex}`] = roundResult;
+    console.log("[ProcessRound] Adding round to history under gameState at index:", roundIndex);
 
     // Reset round state
     updates["gameState/roundBids"] = null;
     updates["gameState/roundStartTime"] = null;
 
     // Update player states under gameState
-    Object.keys(gameState.players).forEach((playerId) => {
-
+    playerIds.forEach((playerId) => {
       // Reset bid state
       updates[`gameState/players/${playerId}/hasSubmittedBid`] = false;
       updates[`gameState/players/${playerId}/currentBid`] = null;
@@ -104,28 +116,29 @@ async function processGameRound(
       const allRounds = [...(gameState.roundHistory || []), roundResult];
 
       const allProfits = allRounds.reduce((acc, round) => {
-        Object.entries(round.profits).forEach(([playerId, profit]) => {
-          acc[playerId] = (acc[playerId] || 0) + profit;
+        Object.entries(round.profits || {}).forEach(([playerId, profit]) => {
+          acc[playerId] = (acc[playerId] || 0) + (profit || 0);
         });
         return acc;
       }, {} as Record<string, number>);
 
       const bestRound = allRounds.reduce(
         (best, round) => {
-          const maxProfit = Math.max(...Object.values(round.profits));
-          return maxProfit > best.profit ? { round: round.round, profit: maxProfit } : best;
+          const maxProfit = Math.max(...Object.values(round.profits || {}));
+          return maxProfit > best.profit ? { round: round.round || 0, profit: maxProfit } : best;
         },
         { round: 0, profit: -Infinity }
       );
 
+      const totalRoundCount = allRounds.length * playerIds.length || 1;
       const averageMarketShare = allRounds
-        .flatMap((round) => Object.values(round.marketShares))
-        .reduce((sum, share) => sum + share, 0) / (gameState.totalRounds * Object.keys(gameState.players).length);
+        .flatMap((round) => Object.values(round.marketShares || {}))
+        .reduce((sum, share) => sum + (share || 0), 0) / totalRoundCount;
 
       // Update final game state
       updates["gameState/isActive"] = false;
       updates["gameState/isEnded"] = true;
-      updates["gameState/totalProfit"] = Object.values(allProfits).reduce((sum, profit) => sum + profit, 0);
+      updates["gameState/totalProfit"] = Object.values(allProfits).reduce((sum, profit) => sum + (profit || 0), 0);
       updates["gameState/bestRound"] = bestRound.round;
       updates["gameState/bestRoundProfit"] = bestRound.profit;
       updates["gameState/averageMarketShare"] = averageMarketShare;
@@ -139,8 +152,8 @@ async function processGameRound(
         averageMarketShare,
       });
     } else {
-      console.log("[ProcessRound] Advancing to next round:", gameState.currentRound + 1);
-      updates["gameState/currentRound"] = gameState.currentRound + 1;
+      console.log("[ProcessRound] Advancing to next round:", (gameState.currentRound || 0) + 1);
+      updates["gameState/currentRound"] = (gameState.currentRound || 0) + 1;
     }
 
     // Perform all updates atomically
@@ -154,10 +167,10 @@ async function processGameRound(
       action: "process_round",
       status: "success",
       details: {
-        round: gameState.currentRound,
-        playerCount: Object.keys(gameState.players).length,
+        round: gameState.currentRound || 0,
+        playerCount: playerIds.length,
         processedBids: Object.keys(updatedBids).length,
-        timeoutBids: Object.keys(gameState.players).length - Object.keys(updatedBids).length,
+        timeoutBids: playerIds.length - Object.keys(updatedBids).length,
       },
     });
   } catch (error) {
@@ -165,13 +178,12 @@ async function processGameRound(
     // Log error in round processing
     await AutopilotMonitor.logEvent({
       gameId,
-      action: "process_round",
+      action: "error",
       status: "failure",
       details: {
-        round: gameState.currentRound,
+        round: gameState.currentRound || 0,
         error: error instanceof Error ? error.message : "Unknown error",
-        playerCount: Object.keys(gameState.players).length,
-        processedBids: Object.keys(gameState.players).length,
+        playerCount: playerIds.length,
       },
     });
     throw error;
@@ -189,13 +201,29 @@ async function startNewRound(
 ): Promise<void> {
   console.log("[StartRound] Starting new round");
 
+  if (!gameRef?.key || !gameState || !gameState.players) {
+    console.error("[StartRound] Invalid game state or reference:", {
+      hasGameRef: !!gameRef,
+      hasKey: !!gameRef?.key,
+      hasGameState: !!gameState,
+      hasPlayers: !!gameState?.players,
+    });
+    throw new Error("Invalid game state or reference: required fields missing");
+  }
+
+  const players = gameState.players || {};
+  const playerIds = Object.keys(players);
+
   // Check for minimum player count
-  const activePlayers = Object.values(gameState.players).filter(
-    (player) => !player.isTimedOut
+  const activePlayers = Object.values(players).filter(
+    (player) => player && !player.isTimedOut
   );
 
   if (activePlayers.length < 2) {
-    console.log("[StartRound] Not enough active players to start round");
+    console.log("[StartRound] Not enough active players to start round:", {
+      totalPlayers: playerIds.length,
+      activePlayers: activePlayers.length,
+    });
     return;
   }
 
@@ -205,19 +233,19 @@ async function startNewRound(
   };
 
   // Reset player bid states for the new round
-  Object.keys(gameState.players).forEach((playerId) => {
+  playerIds.forEach((playerId) => {
     updates[`gameState/players/${playerId}/hasSubmittedBid`] = false;
     updates[`gameState/players/${playerId}/currentBid`] = null;
   });
 
   // Auto-assign all players as rivals to each other if rivalries not set
-  if (!gameState.rivalries || Object.keys(gameState.rivalries).length === 0) {
-    const allPlayers = Object.keys(gameState.players);
+  const rivalries = gameState.rivalries || {};
+  if (!rivalries || Object.keys(rivalries).length === 0) {
     const newRivalries: Record<string, string[]> = {};
 
     // For each player, assign all other players as rivals
-    allPlayers.forEach((player) => {
-      newRivalries[player] = allPlayers.filter((p) => p !== player);
+    playerIds.forEach((player) => {
+      newRivalries[player] = playerIds.filter((p) => p !== player);
     });
 
     updates["gameState/rivalries"] = newRivalries;
@@ -234,16 +262,23 @@ async function startNewRound(
  * @return {boolean} True if all players have submitted bids
  */
 function allPlayersSubmittedBids(gameState: GameState): boolean {
-  const activePlayers = Object.values(gameState.players).filter(
-    (player) => !player.isTimedOut
+  if (!gameState?.players) {
+    console.log("[CheckBids] No players in game state");
+    return false;
+  }
+
+  const players = gameState.players || {};
+  const activePlayers = Object.values(players).filter(
+    (player) => player && !player.isTimedOut
   );
 
   // Need at least 2 active players
   if (activePlayers.length < 2) {
+    console.log("[CheckBids] Not enough active players:", activePlayers.length);
     return false;
   }
 
-  return activePlayers.every((player) => player.hasSubmittedBid);
+  return activePlayers.every((player) => player?.hasSubmittedBid === true);
 }
 
 /**
@@ -253,20 +288,39 @@ function allPlayersSubmittedBids(gameState: GameState): boolean {
  * @return {boolean} True if the current round should be processed
  */
 function shouldProcessRound(gameState: GameState, currentTime: number): boolean {
-  if (!gameState.roundStartTime) return false;
+  if (!gameState?.roundStartTime || !gameState?.players || !gameState?.roundTimeLimit) {
+    console.log("[ProcessCheck] Missing required game state fields:", {
+      hasStartTime: !!gameState?.roundStartTime,
+      hasPlayers: !!gameState?.players,
+      hasTimeLimit: !!gameState?.roundTimeLimit,
+    });
+    return false;
+  }
 
-  // Check for minimum player count
-  const activePlayers = Object.values(gameState.players).filter(
-    (player) => !player.isTimedOut
+  const players = gameState.players || {};
+  const activePlayers = Object.values(players).filter(
+    (player) => player && !player.isTimedOut
   );
 
   if (activePlayers.length < 2) {
-    console.log("[ProcessRound] Not enough active players to process round");
+    console.log("[ProcessCheck] Not enough active players:", {
+      totalPlayers: Object.keys(players).length,
+      activePlayers: activePlayers.length,
+    });
     return false;
   }
 
   const timeElapsed = currentTime - gameState.roundStartTime;
-  return timeElapsed >= (gameState.roundTimeLimit * 1000) || allPlayersSubmittedBids(gameState);
+  const shouldProcess = timeElapsed >= (gameState.roundTimeLimit * 1000) || allPlayersSubmittedBids(gameState);
+
+  console.log("[ProcessCheck] Round processing check:", {
+    timeElapsed,
+    timeLimit: gameState.roundTimeLimit * 1000,
+    allBidsSubmitted: allPlayersSubmittedBids(gameState),
+    shouldProcess,
+  });
+
+  return shouldProcess;
 }
 
 // Cleanup old logs every day
@@ -308,6 +362,12 @@ export const processAutopilot = onSchedule({
     // Process each active game
     const gamePromises = Object.entries(games).map(async ([gameId, game]) => {
       console.log(`[Autopilot] Processing game: ${gameId}`);
+
+      if (!game?.gameState) {
+        console.error(`[Autopilot] Game ${gameId}: Invalid game state`);
+        return;
+      }
+
       const { gameState } = game;
       const gameRef = gamesRef.child(gameId);
 
@@ -319,42 +379,51 @@ export const processAutopilot = onSchedule({
 
       const currentTime = Date.now();
 
-      // Handle active game
-      if (gameState.hasGameStarted && !gameState.isEnded) {
-        // Check if round hasn't started yet (roundStartTime is null)
-        if (!gameState.roundStartTime) {
-          console.log(`[Autopilot] Game ${gameId}: Round not started, initiating new round`);
-          await startNewRound(gameRef, gameState);
-          return;
-        }
+      try {
+        // Handle active game
+        if (gameState.hasGameStarted && !gameState.isEnded) {
+          // Check if round hasn't started yet (roundStartTime is null)
+          if (!gameState.roundStartTime) {
+            console.log(`[Autopilot] Game ${gameId}: Round not started, initiating new round`);
+            await startNewRound(gameRef, gameState);
+            return;
+          }
 
-        // Check if we need to process current round
-        if (shouldProcessRound(gameState, currentTime)) {
-          console.log(`[Autopilot] Game ${gameId}: Processing round ${gameState.currentRound}`);
-          try {
+          // Check if we need to process current round
+          if (shouldProcessRound(gameState, currentTime)) {
+            console.log(`[Autopilot] Game ${gameId}: Processing round ${gameState.currentRound || 1}`);
+
             await processGameRound(gameRef, gameState);
 
             // Start next round if game hasn't ended
             const updatedSnapshot = await gameRef.child("gameState").once("value");
             const updatedState = updatedSnapshot.val() as GameState;
 
-            if (!updatedState.isEnded) {
+            if (updatedState && !updatedState.isEnded) {
               await startNewRound(gameRef, updatedState);
             }
-          } catch (error) {
-            console.error(`[Autopilot] Game ${gameId}: Error processing round:`, error);
           }
-        } else {
-          console.log(`[Autopilot] Game ${gameId}: Round not ready for processing yet`);
         }
+      } catch (error) {
+        console.error(`[Autopilot] Game ${gameId}: Error processing game:`, error);
+        await AutopilotMonitor.logEvent({
+          gameId,
+          action: "error",
+          status: "failure",
+          details: {
+            round: gameState.currentRound || 0,
+            error: error instanceof Error ? error.message : "Unknown error",
+            playerCount: Object.keys(gameState.players || {}).length,
+          },
+        });
       }
     });
 
-    console.log("[Autopilot] Waiting for all game processing to complete...");
     await Promise.all(gamePromises);
-    console.log("[Autopilot] All games processed successfully");
+    console.log("[Autopilot] Completed processing all games");
   } catch (error) {
     console.error("[Autopilot] Error in main autopilot process:", error);
+    throw error;
   }
 });
 
