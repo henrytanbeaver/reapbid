@@ -270,7 +270,8 @@ export class FirebaseStorageAdapter implements StorageAdapter {
         config: data.config || {},
         players: Object.keys(data.gameState?.players || {}).length || 0,
         currentRound: data.gameState?.currentRound || 1,
-        totalRounds: data.gameState?.totalRounds || 0
+        totalRounds: data.gameState?.totalRounds || 0,
+        isActive: data.gameState?.isActive || false
       };
     } catch (error) {
       console.error('Error getting session metadata:', error);

@@ -32,14 +32,16 @@ const SessionSelectionDialog: React.FC<SessionSelectionDialogProps> = ({
 }) => {
   const { sessions, currentSessionId, isLoading, error, refreshSessions } = useSession();
 
-  const activeSessions = sessions.filter(session => session.status === 'active');
+  const activeSessions = sessions.filter(session => session.status === 'active'
+    && session.currentRound > 0 && session?.isActive !== false
+  );
 
   // Refresh sessions when dialog opens
   useEffect(() => {
     if (open && !isLoading) {
       refreshSessions();
     }
-  }, [open]);
+  }, [open, refreshSessions]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
