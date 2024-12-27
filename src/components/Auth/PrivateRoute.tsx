@@ -8,10 +8,11 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, adminOnly = false }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin, isAdminLoading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  // Wait for both auth and admin status check if needed
+  if (loading || (adminOnly && isAdmin === undefined)) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -24,7 +25,11 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, adminOnly = false
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // For now, all authenticated users can access admin routes
+  // Check admin access for admin routes
+  if (adminOnly && !isAdmin) {
+    return <Navigate to="/home" state={{ from: location }} replace />;
+  }
+
   return <>{children}</>;
 };
 

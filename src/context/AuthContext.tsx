@@ -1,20 +1,14 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import {
-  getAuth,
-  signInWithPopup,
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  User,
-  signOut as firebaseSignOut,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { User } from 'firebase/auth';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { auth, database } from '../firebase/config';
+import { signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { ref, get } from 'firebase/database';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
+  isAdmin: boolean | undefined;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
@@ -23,13 +17,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  return context;
-};
+  return {
+    ...context,
+    isAdminLoading: context.user != null && context.isAdmin === undefined
+  };
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -37,66 +34,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean | undefined>(undefined);
+
+  // Check admin status whenever user changes
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) {
+        setIsAdmin(undefined);
+        return;
+      }
+
+      try {
+        const adminRef = ref(database, `users/${user.uid}/roles/admin`);
+        const snapshot = await get(adminRef);
+        setIsAdmin(snapshot.val() === true);
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [user]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
       setUser(user);
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => unsubscribe();
   }, []);
 
   const signInWithGoogle = async () => {
     try {
-      setError(null);
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      setError(error.message);
-      throw error;
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      setError('Failed to sign in with Google');
     }
   };
 
   const signInWithEmail = async (email: string, password: string) => {
     try {
-      setError(null);
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-      let errorMessage = 'Failed to sign in';
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email';
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password';
-      }
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (error) {
+      console.error('Error signing in with email:', error);
+      setError('Failed to sign in with email');
+      throw error;
     }
   };
 
   const signUpWithEmail = async (email: string, password: string) => {
     try {
-      setError(null);
       await createUserWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-      let errorMessage = 'Failed to create account';
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'An account with this email already exists';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'Password should be at least 6 characters';
-      }
-      setError(errorMessage);
-      throw new Error(errorMessage);
+    } catch (error) {
+      console.error('Error signing up with email:', error);
+      setError('Failed to sign up with email');
+      throw error;
     }
   };
 
   const signOut = async () => {
     try {
-      setError(null);
       await firebaseSignOut(auth);
-    } catch (error: any) {
-      setError(error.message);
-      throw error;
+    } catch (error) {
+      console.error('Error signing out:', error);
+      setError('Failed to sign out');
     }
   };
 
@@ -104,13 +109,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     user,
     loading,
     error,
+    isAdmin,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
     signOut,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  );
 };
-
-export { useAuth };

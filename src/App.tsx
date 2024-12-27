@@ -11,6 +11,7 @@ import HomePage from './pages/HomePage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import Navbar from './components/Navigation/Navbar';
 import { useAuth } from './context/AuthContext';
+import UserAdmin from './components/Admin/UserAdmin';
 
 // Layout component for protected routes
 const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -50,9 +51,16 @@ const App: React.FC = () => {
               <Route path="/home" element={<HomePage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/admin" element={
-                <PrivateRoute>
+                <PrivateRoute adminOnly={true}>
                   <ProtectedLayout>
                     <AdminPage />
+                  </ProtectedLayout>
+                </PrivateRoute>
+              } />
+              <Route path="/admin/users" element={
+                <PrivateRoute adminOnly={true}>
+                  <ProtectedLayout>
+                    <UserAdmin />
                   </ProtectedLayout>
                 </PrivateRoute>
               } />
