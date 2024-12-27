@@ -27,7 +27,8 @@ import {
   FormGroup,
   FormControlLabel,
   Switch,
-  Divider
+  Divider,
+  Stack
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -381,95 +382,110 @@ const SessionManagerComponent: React.FC = () => {
   }, [newSessionName, config, currentCategory, createError, gameState]);
 
   return (
-    <Paper sx={{ p: 2, mb: 2 }}>
+    <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6" component="h2">
-          Game Sessions
-        </Typography>
-        <Box>
-          <Tooltip title="Refresh sessions">
-            <IconButton onClick={refreshSessions} disabled={isLoading}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
+        <Stack direction="row" spacing={2} alignItems="center">
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={handleOpenCreateDialog}
-            disabled={isLoading}
+            onClick={() => setIsCreateDialogOpen(true)}
+            sx={{ minWidth: 150 }}
           >
             New Session
           </Button>
-        </Box>
+          <IconButton 
+            onClick={refreshSessions}
+            color="primary"
+            size="small"
+            sx={{ ml: 1 }}
+          >
+            <RefreshIcon />
+          </IconButton>
+        </Stack>
       </Box>
 
-      {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
-          {error}
-        </Typography>
-      )}
-
-      <TableContainer>
+      <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Players</TableCell>
-              <TableCell>Round</TableCell>
-              <TableCell>Created</TableCell>
-              <TableCell>Last Updated</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: '30%' }}>Session Name</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Players</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Round</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Created</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: '10%' }} align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {sessionData.map((session) => (
-              <TableRow 
-                key={session.id}
-                selected={session.isSelected}
-                hover
-              >
-                <TableCell>{session.name}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={session.status}
-                    color={getStatusColor(session.status)}
-                    size="small"
-                  />
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                  <CircularProgress size={24} />
                 </TableCell>
-                <TableCell>{session.players || 0}</TableCell>
-                <TableCell>
-                  {displayRound(session.currentRound, session.totalRounds)}
+              </TableRow>
+            ) : sessionData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 2, color: 'text.secondary' }}>
+                  No sessions found. Create a new session to get started.
                 </TableCell>
-                <TableCell>{formatDate(session.createdAt)}</TableCell>
-                <TableCell>{formatDate(session.updatedAt)}</TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
+              </TableRow>
+            ) : (
+              sessionData.map((session) => (
+                <TableRow 
+                  key={session.id}
+                  onClick={() => !isLoading && selectSession(session.id)}
+                  sx={{
+                    cursor: 'pointer',
+                    backgroundColor: session.isSelected ? 'action.selected' : 'inherit',
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                  }}
+                >
+                  <TableCell sx={{ fontWeight: session.isSelected ? 'bold' : 'normal' }}>
+                    {session.name}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={session.status}
                       size="small"
-                      variant={session.isSelected ? "contained" : "outlined"}
-                      onClick={() => handleSelectSession(session.id)}
-                      disabled={session.status === 'archived'}
-                    >
-                      {session.isSelected ? 'Selected' : 'Select'}
-                    </Button>
-                    {((session.id === currentSessionId && gameState?.isEnded) || session.status === 'completed') && (
-                      <Button
+                      color={session.statusColor}
+                      variant={session.isSelected ? "filled" : "outlined"}
+                      sx={{ minWidth: 80 }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {session.players || 0}
+                  </TableCell>
+                  <TableCell>
+                    {session.currentRound !== undefined ? displayRound(session.currentRound, session.totalRounds) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(session.createdAt).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="Delete Session">
+                      <IconButton
                         size="small"
-                        color="error"
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
-                            deleteSession(session.id);
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSession(session.id);
+                        }}
+                        sx={{
+                          opacity: 0.7,
+                          '&:hover': {
+                            opacity: 1,
+                            color: 'error.main'
                           }
                         }}
                       >
-                        Delete
-                      </Button>
-                    )}
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ))}
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
@@ -520,7 +536,7 @@ const SessionManagerComponent: React.FC = () => {
           )}
         </DialogActions>
       </Dialog>
-    </Paper>
+    </Box>
   );
 };
 

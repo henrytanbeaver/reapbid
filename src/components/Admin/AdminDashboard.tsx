@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../../context/GameContext';
 import { useSession } from '../../context/SessionContext';
+import { Link, useNavigate } from 'react-router-dom';
 import { SessionManager } from './SessionManager';
 import PlayerTrackingTable from './PlayerTrackingTable';
 import RivalryTable from './RivalryTable';
@@ -10,18 +11,10 @@ import {
   Typography,
   Paper,
   Grid,
-  TextField,
   Button,
   Stack,
   ThemeProvider,
   createTheme,
-  TableContainer,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  LinearProgress,
   Checkbox,
   FormControlLabel,
 } from '@mui/material';
@@ -29,7 +22,8 @@ import {
   PlayArrow as PlayArrowIcon,
   Stop as StopIcon,
   RestartAlt as RestartAltIcon,
-  Shuffle as ShuffleIcon
+  Shuffle as ShuffleIcon,
+  People as PeopleIcon
 } from '@mui/icons-material';
 import { toggleAutopilot } from '../../firebase/functions';
 
@@ -275,6 +269,20 @@ const AdminDashboard: React.FC = () => {
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <Paper sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">
+                    Admin Tools
+                  </Typography>
+                  <Button
+                    component={Link}
+                    to="/admin/users"
+                    variant="outlined"
+                    startIcon={<PeopleIcon />}
+                    color="primary"
+                  >
+                    Manage Users
+                  </Button>
+                </Box>
                 <SessionManager />
               </Paper>
             </Grid>
