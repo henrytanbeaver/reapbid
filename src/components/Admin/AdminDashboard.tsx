@@ -275,9 +275,6 @@ const AdminDashboard: React.FC = () => {
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Session Management
-                </Typography>
                 <SessionManager />
               </Paper>
             </Grid>
@@ -422,9 +419,6 @@ const AdminDashboard: React.FC = () => {
                 {currentSessionId && gameState?.roundHistory?.length > 0 && (
                   <Grid item xs={12}>
                     <Paper sx={{ p: 3 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Game Summary
-                      </Typography>
                       <GameSummaryTable />
                     </Paper>
                   </Grid>
