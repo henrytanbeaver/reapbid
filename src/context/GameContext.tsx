@@ -2,6 +2,11 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { StorageFactory, StorageType } from "../storage/StorageFactory";
 import { useSession } from "./SessionContext";
 import { GameState, Player, RoundResult, VisibilitySettings } from "../types/game";
+import { 
+  calculateMarketShare, 
+  calculateProfit, 
+  DEFAULT_MARKET_SIZE 
+} from "../utils/gameCalculations";
 
 // Re-export types for backward compatibility
 export type { GameState, Player, RoundResult, VisibilitySettings };
@@ -60,129 +65,6 @@ const initialGameState: GameState = {
     showCostPerUnit: true,
     showPriceRange: true
   }
-};
-
-const DEFAULT_ALPHA = 0.1; // Default price sensitivity
-const DEFAULT_MARKET_SIZE = 1000; // Default market size
-
-const calculateMarketShare = (
-  playerBid: number, 
-  rivalBids: number[], 
-  alpha: number = DEFAULT_ALPHA
-): number => {
-  // If player bid is 0, they get 0% market share
-  if (playerBid === 0) {
-    return 0;
-  }
-  
-  // If no rivals or all rivals bid 0, player gets 100%
-  if (rivalBids.length === 0 || rivalBids.every(bid => bid === 0)) {
-    return 1;
-  }
-  
-  // Calculate shares using only non-zero bids
-  const playerExp = Math.exp(-alpha * playerBid);
-  const totalExp = rivalBids.reduce(
-    (sum, bid) => sum + (bid === 0 ? 0 : Math.exp(-alpha * bid)), 
-    playerExp
-  );
-  
-  const share = playerExp / totalExp;
-  return share;
-};
-
-const calculateProfit = (
-  bid: number, 
-  marketShare: number, 
-  costPerUnit: number, 
-  marketSize: number = DEFAULT_MARKET_SIZE
-): number => {
-  // Calculate quantity sold using market share and total market size
-  const quantitySold = marketSize * marketShare;
-  
-  // Calculate profit as quantity * (price - cost)
-  const profit = quantitySold * (bid - costPerUnit);
-  return profit;
-};
-
-const calculateMaxRivalProfit = (
-  rivals: string[],
-  roundBids: Record<string, number>,
-  marketShares: Record<string, number>,
-  costPerUnit: number,
-  marketSize: number = DEFAULT_MARKET_SIZE
-): number => {
-  let maxProfit = 0;
-  
-  for (const rival of rivals) {
-    const rivalBid = roundBids[rival] || 0;
-    const rivalShare = marketShares[rival] || 0;
-    
-    // Only consider rivals who participated (non-zero bid)
-    if (rivalBid > 0) {
-      const profit = calculateProfit(rivalBid, rivalShare, costPerUnit, marketSize);
-      maxProfit = Math.max(maxProfit, profit);
-    }
-  }
-  
-  return maxProfit;
-};
-
-const calculateOpportunityCost = (
-  rivals: string[],
-  roundBids: Record<string, number>,
-  marketShares: Record<string, number>,
-  costPerUnit: number,
-  marketSize: number = DEFAULT_MARKET_SIZE
-): number => {
-  // Find the maximum profit among rivals
-  let maxRivalProfit = 0;
-  
-  for (const rival of rivals) {
-    const rivalBid = roundBids[rival] || 0;
-    const rivalShare = marketShares[rival] || 0;
-    const rivalProfit = calculateProfit(rivalBid, rivalShare, costPerUnit, marketSize);
-    maxRivalProfit = Math.max(maxRivalProfit, rivalProfit);
-  }
-  
-  return maxRivalProfit;
-};
-
-const assignRoundRobin = (players: string[]): Record<string, string[]> => {
-  const rivalries: Record<string, string[]> = {};
-  
-  // Initialize all players with empty arrays
-  players.forEach(player => {
-    rivalries[player] = [];
-  });
-
-  if (players.length < 2) return rivalries;
-
-  // 1. Shuffle the players array
-  const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
-
-  // 2. Match first with last, second with second last, etc.
-  const midPoint = Math.floor(shuffledPlayers.length / 2);
-  for (let i = 0; i < midPoint; i++) {
-    const player1 = shuffledPlayers[i];
-    const player2 = shuffledPlayers[shuffledPlayers.length - 1 - i];
-    
-    rivalries[player1].push(player2);
-    rivalries[player2].push(player1);
-  }
-
-  // 3. If odd number of players, match the middle player with the first pair
-  if (shuffledPlayers.length % 2 === 1) {
-    const middlePlayer = shuffledPlayers[midPoint];
-    const firstPlayer = shuffledPlayers[0];
-    const lastPlayer = shuffledPlayers[shuffledPlayers.length - 1];
-    
-    rivalries[middlePlayer].push(firstPlayer, lastPlayer);
-    rivalries[firstPlayer].push(middlePlayer);
-    rivalries[lastPlayer].push(middlePlayer);
-  }
-
-  return rivalries;
 };
 
 const defaultContextValue: GameContextType = {

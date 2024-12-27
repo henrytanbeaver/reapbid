@@ -22,7 +22,7 @@ import {
   TableCell,
   TableBody,
   LinearProgress,
-  Switch,
+  Checkbox,
   FormControlLabel,
 } from '@mui/material';
 import {
@@ -170,11 +170,22 @@ const AdminDashboard: React.FC = () => {
     setPlayerStats(calculatePlayerStats());
   }, [gameState?.players]);
 
+  // Reset autopilot state when session changes
   useEffect(() => {
-    if (gameState?.autopilot?.enabled !== undefined) {
-      setIsAutopilotEnabled(gameState.autopilot.enabled);
+    setIsAutopilotEnabled(false);
+    setAutopilotError(null);
+  }, [currentSessionId]);
+
+  // Update autopilot state whenever gameState changes
+  useEffect(() => {
+    if (!currentSessionId || !gameState) {
+      setIsAutopilotEnabled(false);
+      return;
     }
-  }, [gameState?.autopilot?.enabled]);
+    
+    setIsAutopilotEnabled(gameState.autopilot?.enabled ?? false);
+    setAutopilotError(null);
+  }, [currentSessionId, gameState]);
 
   const handleStartGame = async () => {
     if (!currentSessionId) {
@@ -241,12 +252,12 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleToggleAutopilot = async () => {
+  const handleToggleAutopilot = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!currentSessionId) return;
 
     try {
       setAutopilotError(null);
-      await toggleAutopilot({ gameId: currentSessionId, enabled: !isAutopilotEnabled });
+      await toggleAutopilot({ gameId: currentSessionId, enabled: event.target.checked });
     } catch (error) {
       console.error('Error toggling autopilot:', error);
       setAutopilotError('Failed to toggle autopilot. Please try again.');
@@ -349,7 +360,7 @@ const AdminDashboard: React.FC = () => {
                       </Typography>
                       <FormControlLabel
                         control={
-                          <Switch
+                          <Checkbox
                             checked={isAutopilotEnabled}
                             onChange={handleToggleAutopilot}
                             disabled={!gameState?.isActive || gameState?.isEnded}
@@ -358,18 +369,18 @@ const AdminDashboard: React.FC = () => {
                         label={
                           <Box>
                             <Typography>
-                              Autopilot {isAutopilotEnabled ? 'Enabled' : 'Disabled'}
+                              Enable Autopilot Mode
                             </Typography>
                             {gameState?.autopilot?.lastUpdateTime && (
                               <Typography variant="caption" color="textSecondary">
-                                Last Update: {new Date(gameState.autopilot.lastUpdateTime?? 0).toLocaleString()}
+                                Last Update: {new Date(gameState.autopilot.lastUpdateTime ?? 0).toLocaleString()}
                               </Typography>
                             )}
                           </Box>
                         }
                       />
                       {autopilotError && (
-                        <Typography color="error" variant="caption">
+                        <Typography color="error" variant="caption" display="block" sx={{ mt: 1 }}>
                           {autopilotError}
                         </Typography>
                       )}
