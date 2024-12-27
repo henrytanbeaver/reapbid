@@ -155,25 +155,37 @@ const SessionManagerComponent: React.FC = () => {
               <ButtonGroup size="small" sx={{ mb: 2 }}>
                 <Button 
                   variant={currentCategory === 'animals' ? 'contained' : 'outlined'}
-                  onClick={() => setNewSessionName(generateSessionName('animals'))}
+                  onClick={() => {
+                    setCurrentCategory('animals');
+                    setNewSessionName(generateSessionName('animals'));
+                  }}
                 >
                   Animal
                 </Button>
                 <Button 
                   variant={currentCategory === 'flowers' ? 'contained' : 'outlined'}
-                  onClick={() => setNewSessionName(generateSessionName('flowers'))}
+                  onClick={() => {
+                    setCurrentCategory('flowers');
+                    setNewSessionName(generateSessionName('flowers'));
+                  }}
                 >
                   Flower
                 </Button>
                 <Button 
                   variant={currentCategory === 'cars' ? 'contained' : 'outlined'}
-                  onClick={() => setNewSessionName(generateSessionName('cars'))}
+                  onClick={() => {
+                    setCurrentCategory('cars');
+                    setNewSessionName(generateSessionName('cars'));
+                  }}
                 >
                   Car
                 </Button>
                 <Button 
                   variant={currentCategory === 'cities' ? 'contained' : 'outlined'}
-                  onClick={() => setNewSessionName(generateSessionName('cities'))}
+                  onClick={() => {
+                    setCurrentCategory('cities');
+                    setNewSessionName(generateSessionName('cities'));
+                  }}
                 >
                   City
                 </Button>
