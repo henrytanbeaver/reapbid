@@ -5,6 +5,7 @@ import { GameState, Player, RoundResult, VisibilitySettings } from "../types/gam
 import { 
   calculateMarketShare, 
   calculateProfit, 
+  calculateAllMarketShares, 
   DEFAULT_MARKET_SIZE 
 } from "../utils/gameCalculations";
 
@@ -275,55 +276,25 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const profits: Record<string, number> = {};
     const roundBids: Record<string, number> = {};
 
-    // Initialize all players with 0 bids and market shares
+    // Initialize all players with maxBid for non-submitted bids
     allPlayers.forEach(player => {
-      roundBids[player] = gameState.roundBids?.[player] || 0;
+      roundBids[player] = gameState.roundBids?.[player] ?? gameState.maxBid;
       marketShares[player] = 0;
       profits[player] = 0;
     });
 
-    // First pass: Calculate market shares
-    allPlayers.forEach(player => {
-      const rivals = gameState.rivalries?.[player] || [];
-      const playerBid = roundBids[player] || 0;
-      const rivalBids = rivals.map(rival => roundBids[rival] || 0);
-      
-      if (playerBid === 0) {
-        marketShares[player] = 0;
-      } else if (rivals.every(rival => roundBids[rival] === 0)) {
-        marketShares[player] = 1;
-      } else {
-        marketShares[player] = calculateMarketShare(playerBid, rivalBids);
-      }
-    });
+    // Calculate market shares for all players at once
+    const calculatedMarketShares = calculateAllMarketShares(roundBids, gameState.alpha);
+    Object.assign(marketShares, calculatedMarketShares);
 
-    // Second pass: Calculate profits for non-zero bids
+    // Calculate profits
     allPlayers.forEach(player => {
-      const playerBid = roundBids[player] || 0;
-      if (playerBid > 0) {
-        profits[player] = calculateProfit(
-          playerBid,
-          marketShares[player],
-          gameState.costPerUnit
-        );
-      }
-    });
-
-    // Third pass: Handle zero bids using maximum rival profit
-    allPlayers.forEach(player => {
-      const playerBid = roundBids[player] || 0;
-      if (playerBid === 0) {
-        const rivals = gameState.rivalries?.[player] || [];
-        // Get all rival profits (they're already calculated)
-        const rivalProfits = rivals.map(rival => {
-          const profit = profits[rival] || 0;
-          return profit;
-        });
-        
-        // Set profit to negative of the maximum rival profit
-        const maxRivalProfit = Math.max(...rivalProfits);
-        profits[player] = -maxRivalProfit;
-      }
+      profits[player] = calculateProfit(
+        roundBids[player],
+        marketShares[player],
+        gameState.costPerUnit,
+        gameState.marketSize
+      );
     });
 
     // Calculate total profit (sum of all profits from all rounds for current player)
