@@ -1,5 +1,5 @@
 import { StorageAdapter } from './StorageAdapter';
-import { GameState, Player, RoundResult } from '../context/GameContext';
+import { GameState } from '../types/game';
 import { SessionMetadata } from './SessionStorageAdapter';
 
 const DEFAULT_ALPHA = 0.5;

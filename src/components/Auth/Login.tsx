@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
   Typography,
   TextField,
   Button,
@@ -14,6 +12,7 @@ import {
   useMediaQuery,
   IconButton,
   InputAdornment,
+  Paper,
 } from '@mui/material';
 import {
   Google as GoogleIcon,
@@ -105,7 +104,7 @@ const Login: React.FC = () => {
           p: 2,
         }}
       >
-        <Card
+        <Paper
           elevation={3}
           sx={{
             width: '100%',
@@ -114,7 +113,7 @@ const Login: React.FC = () => {
             bgcolor: 'background.paper',
           }}
         >
-          <CardContent sx={{ p: 4 }}>
+          <Box sx={{ p: 4 }}>
             {/* Logo */}
             <Typography
               variant="h4"
@@ -307,8 +306,8 @@ const Login: React.FC = () => {
                 Privacy Policy
               </Typography>
             </Typography>
-          </CardContent>
-        </Card>
+          </Box>
+        </Paper>
       </Box>
     </Container>
   );

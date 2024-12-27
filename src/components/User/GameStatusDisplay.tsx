@@ -4,7 +4,6 @@ import {
   Card,
   CardContent,
   Typography,
-  LinearProgress,
   Chip
 } from '@mui/material';
 import { useGame } from '../../context/GameContext';

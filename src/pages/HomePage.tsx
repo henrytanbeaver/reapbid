@@ -6,17 +6,13 @@ import {
   Typography,
   Button,
   Grid,
-  Card,
-  CardContent,
   useTheme,
   useMediaQuery,
   Paper,
 } from '@mui/material';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SchoolIcon from '@mui/icons-material/School';
 import GroupsIcon from '@mui/icons-material/Groups';
 import ScienceIcon from '@mui/icons-material/Science';
-import InfoIcon from '@mui/icons-material/Info';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 
 const HomePage: React.FC = () => {
