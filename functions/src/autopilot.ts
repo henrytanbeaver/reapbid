@@ -15,7 +15,7 @@ import {
  * @param {admin.database.Reference} gameRef Reference to the game in Firebase
  * @param {GameState} gameState Current state of the game
  */
-async function processGameRound(
+export async function processGameRound(
   gameRef: admin.database.Reference,
   gameState: GameState,
 ): Promise<void> {
@@ -261,7 +261,7 @@ async function startNewRound(
  * @param {GameState} gameState Current state of the game
  * @return {boolean} True if all players have submitted bids
  */
-function allPlayersSubmittedBids(gameState: GameState): boolean {
+export function allPlayersSubmittedBids(gameState: GameState): boolean {
   if (!gameState?.players) {
     console.log("[CheckBids] No players in game state");
     return false;
@@ -287,7 +287,7 @@ function allPlayersSubmittedBids(gameState: GameState): boolean {
  * @param {number} currentTime Current timestamp
  * @return {boolean} True if the current round should be processed
  */
-function shouldProcessRound(gameState: GameState, currentTime: number): boolean {
+export function shouldProcessRound(gameState: GameState, currentTime: number): boolean {
   if (!gameState?.roundStartTime || !gameState?.players || !gameState?.roundTimeLimit) {
     console.log("[ProcessCheck] Missing required game state fields:", {
       hasStartTime: !!gameState?.roundStartTime,
@@ -393,14 +393,28 @@ export const processAutopilot = onSchedule({
           if (shouldProcessRound(gameState, currentTime)) {
             console.log(`[Autopilot] Game ${gameId}: Processing round ${gameState.currentRound || 1}`);
 
+            // Process the current round
             await processGameRound(gameRef, gameState);
 
-            // Start next round if game hasn't ended
+            // Get the updated state AFTER processing
             const updatedSnapshot = await gameRef.child("gameState").once("value");
             const updatedState = updatedSnapshot.val() as GameState;
 
-            if (updatedState && !updatedState.isEnded) {
+            // Only start a new round if:
+            // 1. Game state exists
+            // 2. Game hasn't ended
+            // 3. Current round is less than total rounds (we're not in the final round)
+            if (updatedState &&
+                !updatedState.isEnded &&
+                updatedState.currentRound < updatedState.totalRounds) {
+              console.log(`[Autopilot] Game ${gameId}: Starting next round`);
               await startNewRound(gameRef, updatedState);
+            } else {
+              console.log(`[Autopilot] Game ${gameId}: Game complete, not starting new round`, {
+                currentRound: updatedState?.currentRound,
+                totalRounds: updatedState?.totalRounds,
+                isEnded: updatedState?.isEnded,
+              });
             }
           }
         }
