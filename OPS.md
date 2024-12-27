@@ -4,7 +4,7 @@ A list of operation manuals.
 
 ## Setting User Admin
 
-ReapBid uses Firebase Admin SDK to set user admin claims.
+ReapBid uses Firebase Admin SDK to set user admin claims. This is required only for the operation of the cloud functions.
 
 ```bash
 npm install firebase-admin
@@ -40,4 +40,73 @@ setAdminClaim('qPnSTQqCZnTwUpDj30M6IFxjA993');
 
 ```bash
 node setAdmin.js
+```
+
+## Setting User Admin ReapBid UI roles
+
+The rule for ReapBid realtime database access.
+
+```json
+/users
+   /{UID}
+      /roles
+         /admin:true
+```
+
+Replace UID with the firebase user UID you want to set as admin in the UI.
+
+```json
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "games": {
+      "$sessionId": {
+        "gameState": {
+          ".indexOn": "isActive"
+        }
+      }
+    },
+    "users": {
+      "$uid": {
+        "roles": {
+          ".read": "auth != null",
+          ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('roles').child('admin').val() === true)"
+        }
+      }
+    },
+    "gameState": {
+      ".indexOn": "isActive",
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "players": {
+        "$playerId": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['name', 'currentBid', 'hasSubmittedBid', 'lastBidTime', 'isTimedOut'])",
+          "name": {
+            ".validate": "newData.isString()"
+          },
+          "currentBid": {
+            ".validate": "newData.isNumber() || newData.val() == null"
+          },
+          "hasSubmittedBid": {
+            ".validate": "newData.isBoolean()"
+          },
+          "lastBidTime": {
+            ".validate": "newData.val() == null || newData.isNumber()"
+          },
+          "isTimedOut": {
+            ".validate": "newData.isBoolean()"
+          }
+        }
+      },
+      "roundHistory": {
+        "$roundId": {
+          ".validate": "newData.hasChildren(['roundNumber', 'bids', 'profits', 'marketShares'])"
+        }
+      }
+    }
+  }
+}
 ```
