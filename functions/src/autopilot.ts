@@ -84,17 +84,10 @@ async function processGameRound(
 
     // Update player states under gameState
     Object.keys(gameState.players).forEach((playerId) => {
-      const player = gameState.players[playerId];
-      const didNotSubmitBid = !player.hasSubmittedBid;
 
       // Reset bid state
       updates[`gameState/players/${playerId}/hasSubmittedBid`] = false;
       updates[`gameState/players/${playerId}/currentBid`] = null;
-
-      // Mark as timed out if didn't submit bid
-      if (didNotSubmitBid) {
-        updates[`gameState/players/${playerId}/isTimedOut`] = true;
-      }
     });
 
     console.log("[ProcessRound] Game progress check:", {
@@ -215,7 +208,6 @@ async function startNewRound(
   Object.keys(gameState.players).forEach((playerId) => {
     updates[`gameState/players/${playerId}/hasSubmittedBid`] = false;
     updates[`gameState/players/${playerId}/currentBid`] = null;
-    updates[`gameState/players/${playerId}/isTimedOut`] = false;
   });
 
   // Auto-assign all players as rivals to each other if rivalries not set
